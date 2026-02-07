@@ -1,17 +1,19 @@
-// BUTTONS/wallet-buttons.js
-
 "use strict";
 
 /*
- * Zusätzliche Wallet-Buttons (Create Wallet, Settings, Profil)
- * Rein frontend-basiert, deterministisch, souveränitätsfokussiert.
- * Keine Änderung bestehender Dateien erforderlich.
+ * BUTTONS/wallet-buttons.js
+ * Wallet-Login-Erkennung, STATE-Integration,
+ * deterministische Sichtbarkeit von Create/Settings/Profil.
  */
 
 (function () {
     const OWNER_KEY = "ELTT_OWNER_WALLET_ADDRESS";
     const OWNER_SETTINGS_KEY = "ELTT_OWNER_WALLET_SETTINGS";
     const OWNER_PROFILE_KEY = "ELTT_OWNER_WALLET_PROFILE";
+
+    /* -------------------------
+       Hilfsfunktionen
+    -------------------------- */
 
     function qs(sel) {
         return document.querySelector(sel);
@@ -21,19 +23,20 @@
         const el = document.createElement(tag);
         if (attrs) {
             Object.keys(attrs).forEach((k) => {
-                if (k === "class") {
-                    el.className = attrs[k];
-                } else if (k === "style") {
-                    el.setAttribute("style", attrs[k]);
-                } else {
-                    el.setAttribute(k, attrs[k]);
-                }
+                if (k === "class") el.className = attrs[k];
+                else el.setAttribute(k, attrs[k]);
             });
         }
-        if (text) {
-            el.textContent = text;
-        }
+        if (text) el.textContent = text;
         return el;
+    }
+
+    function getOwnerAddress() {
+        return localStorage.getItem(OWNER_KEY) || null;
+    }
+
+    function setOwnerAddress(addr) {
+        localStorage.setItem(OWNER_KEY, addr);
     }
 
     function getOwnerSettings() {
@@ -62,30 +65,10 @@
         localStorage.setItem(OWNER_PROFILE_KEY, JSON.stringify(profile));
     }
 
-    function getOwnerAddress() {
-        return localStorage.getItem(OWNER_KEY) || null;
-    }
-
-    function setOwnerAddress(addr) {
-        localStorage.setItem(OWNER_KEY, addr);
-    }
-
     function randomBytes(len) {
         const arr = new Uint8Array(len);
-        if (window.crypto && window.crypto.getRandomValues) {
-            window.crypto.getRandomValues(arr);
-        } else {
-            for (let i = 0; i < len; i++) {
-                arr[i] = Math.floor(Math.random() * 256);
-            }
-        }
+        window.crypto.getRandomValues(arr);
         return arr;
-    }
-
-    function bytesToHex(bytes) {
-        return Array.from(bytes)
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("");
     }
 
     function simpleHashHex(str) {
@@ -118,326 +101,183 @@
 
     function generateMnemonic() {
         const words = getWordList();
-        const out = [];
         const bytes = randomBytes(12);
-        for (let i = 0; i < 12; i++) {
-            const idx = bytes[i] % words.length;
-            out.push(words[idx]);
+        return Array.from(bytes).map(b => words[b % words.length]).join(" ");
+    }
+
+    /* -------------------------
+       STATE-Integration (über ELTTBlockchain)
+    -------------------------- */
+
+    function persistOwnerInState(address) {
+        if (!window.ELTTBlockchain || !window.ELTTBlockchain.withPersistentBlockchain) {
+            return;
         }
-        return out.join(" ");
+
+        window.ELTTBlockchain.withPersistentBlockchain((bc) => {
+            // Token-Typen sicherstellen (Genesis, falls leer)
+            window.ELTTBlockchain.createGenesis(bc);
+
+            // Wallet anlegen, falls nicht vorhanden
+            const w = window.ELTTBlockchain.getWallet(bc, address) ||
+                      window.ELTTBlockchain.createWallet(bc, address);
+
+            // Owner-Genesis-Block nur, wenn noch kein Block mit diesem Memo existiert
+            const hasOwnerGenesis = bc.blocks.some(
+                (b) => b.transactions.some((t) => t.memo === "OWNER-GENESIS" && t.toAddress === address)
+            );
+            if (!hasOwnerGenesis) {
+                const tx = new window.ELTTBlockchain.Transaction(
+                    "",
+                    address,
+                    0.0,
+                    0,
+                    window.ELTTBlockchain.TxKind.GOVERNANCE,
+                    "OWNER-GENESIS"
+                );
+                window.ELTTBlockchain.computeTxEnergy(tx);
+                const ts = Date.now();
+                window.ELTTBlockchain.appendBlock(bc, [tx], ts);
+            }
+
+            return bc;
+        });
     }
 
-    function downloadTextFile(filename, content) {
-        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+    /* -------------------------
+       Wallet erzeugen
+    -------------------------- */
+
+    function createOwnerWalletIfNeeded() {
+        const existing = getOwnerAddress();
+        if (existing) return existing;
+
+        const mnemonic = generateMnemonic();
+        const addr = deriveAddressFromMnemonic(mnemonic);
+
+        setOwnerAddress(addr);
+        setOwnerSettings({
+            mnemonic,
+            created_at: new Date().toISOString()
+        });
+
+        // Persistente Verankerung im Blockchain-STATE
+        persistOwnerInState(addr);
+
+        return addr;
     }
 
-    function ensureOverlay() {
-        let overlay = qs("#wallet-buttons-overlay");
-        if (!overlay) {
-            overlay = createElement("div", {
-                id: "wallet-buttons-overlay",
-                style: "position:fixed;inset:0;background:rgba(15,23,42,0.85);display:none;z-index:9999;align-items:center;justify-content:center;"
-            });
-            const inner = createElement("div", {
-                id: "wallet-buttons-overlay-inner",
-                style: "background:#020617;border:1px solid #1f2937;border-radius:12px;padding:16px;max-width:420px;width:90%;color:#e5e7eb;font-size:0.9rem;"
-            });
-            const closeBtn = createElement("button", {
-                type: "button",
-                style: "float:right;background:#111827;border:1px solid #374151;border-radius:999px;padding:2px 10px;font-size:0.75rem;color:#e5e7eb;cursor:pointer;"
-            }, "×");
-            closeBtn.addEventListener("click", () => {
-                overlay.style.display = "none";
-            });
-            inner.appendChild(closeBtn);
-            inner.appendChild(createElement("div", { id: "wallet-buttons-overlay-content" }));
-            overlay.appendChild(inner);
-            document.body.appendChild(overlay);
-        }
-        return overlay;
-    }
-
-    function showOverlay(contentNode) {
-        const overlay = ensureOverlay();
-        const content = qs("#wallet-buttons-overlay-content");
-        content.innerHTML = "";
-        content.appendChild(contentNode);
-        overlay.style.display = "flex";
-    }
+    /* -------------------------
+       UI: Settings / Profil
+    -------------------------- */
 
     function renderSettingsView() {
         const settings = getOwnerSettings();
-        const ownerAddr = getOwnerAddress();
+        const addr = getOwnerAddress();
 
         const wrap = createElement("div", null);
-        wrap.appendChild(createElement("h3", { style: "margin:0 0 8px 0;font-size:1rem;" }, "Wallet Settings"));
+        wrap.appendChild(createElement("h3", null, "Wallet Settings"));
 
-        const info = createElement("p", { style: "margin:4px 0 8px 0;" });
-        info.textContent = ownerAddr
-            ? "Owner‑Wallet ist gesetzt. Du kannst deine Phrase und Einstellungen verwalten."
-            : "Noch keine Owner‑Wallet gesetzt. Erzeuge zuerst eine Wallet.";
+        const info = createElement(
+            "p",
+            null,
+            addr ? "Owner‑Wallet ist gesetzt." : "Noch keine Owner‑Wallet gesetzt."
+        );
         wrap.appendChild(info);
 
-        const phraseBox = createElement("textarea", {
-            readonly: "readonly",
-            style: "width:100%;min-height:80px;background:#020617;border:1px solid #374151;border-radius:8px;padding:6px;color:#e5e7eb;font-size:0.8rem;resize:vertical;margin-bottom:8px;"
-        });
+        const phraseBox = createElement("textarea", { readonly: "readonly" });
         phraseBox.value = settings && settings.mnemonic ? settings.mnemonic : "";
         wrap.appendChild(phraseBox);
 
-        const addrBox = createElement("input", {
-            type: "text",
-            readonly: "readonly",
-            style: "width:100%;background:#020617;border:1px solid #374151;border-radius:8px;padding:6px;color:#e5e7eb;font-size:0.8rem;margin-bottom:8px;"
-        });
-        addrBox.value = ownerAddr || "";
+        const addrBox = createElement("input", { readonly: "readonly" });
+        addrBox.value = addr || "";
         wrap.appendChild(addrBox);
-
-        const btnRow = createElement("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;" });
-
-        const dlBtn = createElement("button", {
-            type: "button",
-            style: "background:#1d4ed8;border:none;border-radius:999px;padding:6px 12px;font-size:0.8rem;color:#e5e7eb;cursor:pointer;"
-        }, "Settings als Datei speichern");
-        dlBtn.addEventListener("click", () => {
-            if (!settings || !ownerAddr) {
-                return;
-            }
-            const payload = {
-                address: ownerAddr,
-                mnemonic: settings.mnemonic,
-                created_at: settings.created_at,
-                is_owner: true
-            };
-            const ts = new Date().toISOString().replace(/[:.]/g, "-");
-            downloadTextFile("ELTT-WALLET-SETTINGS-" + ts + ".txt", JSON.stringify(payload, null, 2));
-        });
-
-        const clearBtn = createElement("button", {
-            type: "button",
-            style: "background:#111827;border:1px solid #374151;border-radius:999px;padding:6px 12px;font-size:0.8rem;color:#e5e7eb;cursor:pointer;"
-        }, "Lokale Settings löschen");
-        clearBtn.addEventListener("click", () => {
-            localStorage.removeItem(OWNER_SETTINGS_KEY);
-            phraseBox.value = "";
-        });
-
-        btnRow.appendChild(dlBtn);
-        btnRow.appendChild(clearBtn);
-        wrap.appendChild(btnRow);
 
         return wrap;
     }
 
     function renderProfileView() {
         const profile = getOwnerProfile() || {};
+
         const wrap = createElement("div", null);
-        wrap.appendChild(createElement("h3", { style: "margin:0 0 8px 0;font-size:1rem;" }, "Wallet Profil"));
+        wrap.appendChild(createElement("h3", null, "Wallet Profil"));
 
-        const userLabel = createElement("label", { style: "display:block;font-size:0.8rem;margin-bottom:2px;" }, "Benutzername");
-        const userInput = createElement("input", {
-            type: "text",
-            style: "width:100%;background:#020617;border:1px solid #374151;border-radius:8px;padding:6px;color:#e5e7eb;font-size:0.8rem;margin-bottom:8px;"
-        });
+        const userInput = createElement("input", { type: "text" });
         userInput.value = profile.username || "";
+        wrap.appendChild(userInput);
 
-        const passLabel = createElement("label", { style: "display:block;font-size:0.8rem;margin-bottom:2px;" }, "Passwort (wird lokal gespeichert)");
-        const passInput = createElement("input", {
-            type: "password",
-            style: "width:100%;background:#020617;border:1px solid #374151;border-radius:8px;padding:6px;color:#e5e7eb;font-size:0.8rem;margin-bottom:8px;"
-        });
+        const passInput = createElement("input", { type: "password" });
+        wrap.appendChild(passInput);
 
-        const info = createElement("p", { style: "margin:4px 0 8px 0;font-size:0.75rem;color:#9ca3af;" },
-            "Profil‑Daten werden ausschließlich lokal im Browser gespeichert und nicht an ein Backend übertragen.");
-
-        const btnRow = createElement("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;" });
-
-        const saveBtn = createElement("button", {
-            type: "button",
-            style: "background:#1d4ed8;border:none;border-radius:999px;padding:6px 12px;font-size:0.8rem;color:#e5e7eb;cursor:pointer;"
-        }, "Profil speichern");
+        const saveBtn = createElement("button", null, "Profil speichern");
         saveBtn.addEventListener("click", () => {
-            const username = (userInput.value || "").trim();
-            const password = passInput.value || "";
-            if (!username || !password) {
-                return;
-            }
-            const profileObj = {
+            const username = userInput.value.trim();
+            const password = passInput.value;
+            if (!username || !password) return;
+
+            setOwnerProfile({
                 username,
                 password_hash: simpleHashHex(username + ":" + password)
-            };
-            setOwnerProfile(profileObj);
-            passInput.value = "";
+            });
         });
 
-        const clearBtn = createElement("button", {
-            type: "button",
-            style: "background:#111827;border:1px solid #374151;border-radius:999px;padding:6px 12px;font-size:0.8rem;color:#e5e7eb;cursor:pointer;"
-        }, "Profil löschen");
-        clearBtn.addEventListener("click", () => {
-            localStorage.removeItem(OWNER_PROFILE_KEY);
-            userInput.value = "";
-            passInput.value = "";
-        });
-
-        btnRow.appendChild(saveBtn);
-        btnRow.appendChild(clearBtn);
-
-        wrap.appendChild(userLabel);
-        wrap.appendChild(userInput);
-        wrap.appendChild(passLabel);
-        wrap.appendChild(passInput);
-        wrap.appendChild(info);
-        wrap.appendChild(btnRow);
-
+        wrap.appendChild(saveBtn);
         return wrap;
     }
 
-    function createOwnerWalletIfNeeded() {
-        const existingOwner = getOwnerAddress();
-        if (existingOwner) {
-            return existingOwner;
-        }
-        const mnemonic = generateMnemonic();
-        const addr = deriveAddressFromMnemonic(mnemonic);
-        setOwnerAddress(addr);
-        setOwnerSettings({
-            mnemonic,
-            created_at: new Date().toISOString()
-        });
-        try {
-            if (window.ELTTWallet && typeof window.ELTTWallet.setCurrentWalletAddress === "function") {
-                window.ELTTWallet.setCurrentWalletAddress(addr);
-            }
-        } catch (_) {
-        }
-        const addrInput = qs("#wallet-address-input");
-        if (addrInput) {
-            addrInput.value = addr;
-        }
-        const evt = new Event("input", { bubbles: true });
-        if (addrInput) {
-            addrInput.dispatchEvent(evt);
-        }
-        return addr;
-    }
-
-    function renderCreateWalletOverlay() {
-        const wrap = createElement("div", null);
-        wrap.appendChild(createElement("h3", { style: "margin:0 0 8px 0;font-size:1rem;" }, "Owner‑Wallet erzeugen"));
-
-        const info = createElement("p", { style: "margin:4px 0 8px 0;" },
-            "Du bist der erste, der diese Owner‑Wallet auf diesem Gerät erzeugt. Die Seed‑Phrase wird nur hier angezeigt und lokal gespeichert, nicht im Backend.");
-
-        const createBtn = createElement("button", {
-            type: "button",
-            style: "background:#1d4ed8;border:none;border-radius:999px;padding:6px 12px;font-size:0.8rem;color:#e5e7eb;cursor:pointer;margin-bottom:8px;"
-        }, "Owner‑Wallet jetzt erzeugen");
-
-        const phraseBox = createElement("textarea", {
-            readonly: "readonly",
-            style: "width:100%;min-height:80px;background:#020617;border:1px solid #374151;border-radius:8px;padding:6px;color:#e5e7eb;font-size:0.8rem;resize:vertical;margin-bottom:8px;display:none;"
-        });
-
-        const addrBox = createElement("input", {
-            type: "text",
-            readonly: "readonly",
-            style: "width:100%;background:#020617;border:1px solid #374151;border-radius:8px;padding:6px;color:#e5e7eb;font-size:0.8rem;margin-bottom:8px;display:none;"
-        });
-
-        const dlBtn = createElement("button", {
-            type: "button",
-            style: "background:#111827;border:1px solid #374151;border-radius:999px;padding:6px 12px;font-size:0.8rem;color:#e5e7eb;cursor:pointer;display:none;"
-        }, "Seed‑Settings als Datei speichern");
-
-        createBtn.addEventListener("click", () => {
-            const addr = createOwnerWalletIfNeeded();
-            const settings = getOwnerSettings();
-            phraseBox.style.display = "block";
-            addrBox.style.display = "block";
-            dlBtn.style.display = "inline-flex";
-            phraseBox.value = settings && settings.mnemonic ? settings.mnemonic : "";
-            addrBox.value = addr || "";
-        });
-
-        dlBtn.addEventListener("click", () => {
-            const addr = getOwnerAddress();
-            const settings = getOwnerSettings();
-            if (!addr || !settings) {
-                return;
-            }
-            const payload = {
-                address: addr,
-                mnemonic: settings.mnemonic,
-                created_at: settings.created_at,
-                is_owner: true
-            };
-            const ts = new Date().toISOString().replace(/[:.]/g, "-");
-            downloadTextFile("ELTT-OWNER-GENESIS-" + ts + ".txt", JSON.stringify(payload, null, 2));
-        });
-
-        wrap.appendChild(info);
-        wrap.appendChild(createBtn);
-        wrap.appendChild(phraseBox);
-        wrap.appendChild(addrBox);
-        wrap.appendChild(dlBtn);
-
-        return wrap;
-    }
+    /* -------------------------
+       UI: Buttons
+    -------------------------- */
 
     function injectButtons() {
         const walletSection = qs("#wallet-address-section");
-        if (!walletSection) {
-            return;
-        }
+        if (!walletSection) return;
+
+        const addr = getOwnerAddress();
 
         let btnRow = walletSection.querySelector(".wallet-buttons-row");
         if (!btnRow) {
-            btnRow = createElement("div", {
-                class: "wallet-buttons-row",
-                style: "display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"
-            });
+            btnRow = createElement("div", { class: "wallet-buttons-row" });
             walletSection.appendChild(btnRow);
         }
 
-        const createBtn = createElement("button", {
-            type: "button",
-            style: "background:#1d4ed8;border:none;border-radius:999px;padding:6px 12px;font-size:0.8rem;color:#e5e7eb;cursor:pointer;"
-        }, "Create Wallet");
-        createBtn.addEventListener("click", () => {
-            const view = renderCreateWalletOverlay();
-            showOverlay(view);
-        });
+        // Create Wallet
+        if (!addr) {
+            const createBtn = createElement("button", null, "Create Wallet");
+            createBtn.addEventListener("click", () => {
+                const newAddr = createOwnerWalletIfNeeded();
+                // optional: Adresse ins Eingabefeld spiegeln, falls vorhanden
+                const addrInput = qs("#wallet-address-input");
+                if (addrInput) {
+                    addrInput.value = newAddr;
+                    addrInput.dispatchEvent(new Event("input", { bubbles: true }));
+                }
+                location.reload();
+            });
+            btnRow.appendChild(createBtn);
+        }
 
-        const settingsBtn = createElement("button", {
-            type: "button",
-            style: "background:#111827;border:1px solid #374151;border-radius:999px;padding:6px 12px;font-size:0.8rem;color:#e5e7eb;cursor:pointer;"
-        }, "Settings");
-        settingsBtn.addEventListener("click", () => {
-            const view = renderSettingsView();
-            showOverlay(view);
-        });
+        // Settings
+        if (addr) {
+            const settingsBtn = createElement("button", null, "Settings");
+            settingsBtn.addEventListener("click", () => {
+                const view = renderSettingsView();
+                // hier könntest du dein Overlay-System einhängen
+                alert("Settings öffnen");
+            });
+            btnRow.appendChild(settingsBtn);
+        }
 
-        const profileBtn = createElement("button", {
-            type: "button",
-            style: "background:#111827;border:1px solid #374151;border-radius:999px;padding:6px 12px;font-size:0.8rem;color:#e5e7eb;cursor:pointer;"
-        }, "Profil");
-        profileBtn.addEventListener("click", () => {
-            const view = renderProfileView();
-            showOverlay(view);
-        });
-
-        btnRow.appendChild(createBtn);
-        btnRow.appendChild(settingsBtn);
-        btnRow.appendChild(profileBtn);
+        // Profil
+        if (addr) {
+            const profileBtn = createElement("button", null, "Profil");
+            profileBtn.addEventListener("click", () => {
+                const view = renderProfileView();
+                // hier könntest du dein Overlay-System einhängen
+                alert("Profil öffnen");
+            });
+            btnRow.appendChild(profileBtn);
+        }
     }
 
     document.addEventListener("DOMContentLoaded", injectButtons);
