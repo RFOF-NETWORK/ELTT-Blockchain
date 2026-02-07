@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>ELTT-Blockchain – Referenz-Blockchain-Sicht</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Zentrale Blockchain-Sicht der ELTT-Blockchain. Deterministische, auditierbare und souveränitätsfokussierte Referenzansicht.">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <header id="app-header">
+        <div class="logo">
+            <span class="logo-main">ELTT‑Blockchain</span>
+            <span class="logo-sub">Referenz‑Blockchain · Energie · Tokens</span>
+        </div>
+        <nav id="main-nav">
+            <a href="ELTT-Blockchain.html" data-nav="chain">Blockchain</a>
+            <a href="pages/ELTT-wallet.html" data-nav="wallet">Wallet</a>
+            <a href="pages/ELTT-wallet/ELTT-launcher.html" data-nav="launcher">Launcher / DEX</a>
+            <a href="pages/ELTT-wallet/ELTT-liquidity-pools.html" data-nav="pools">Liquidity‑Pools</a>
+            <a href="pages/ELTT-Viewer.html" data-nav="viewer">Viewer</a>
+        </nav>
+    </header>
+
+    <main id="app-main">
+        <section id="chain-intro">
+            <h2>Zentrale ELTT‑Blockchain‑Sicht</h2>
+            <p>
+                Diese Seite beschreibt und spiegelt die deterministische ELTT‑Blockchain‑Struktur, wie sie in den
+                Backend‑Implementierungen (C und Python) und den Frontend‑Modulen abgebildet ist. Die Owner‑Wallet
+                entsteht ausschließlich im Frontend aus einer 12‑Wort‑Phrase, ist die einzige Genesis‑Wallet, besitzt
+                TTTC, ELTT und ELTC, erzeugt Block&nbsp;2 autonom und ist Ursprung aller Extensions. Im Backend ist
+                keine Adresse, kein Seed und kein privater Schlüssel hinterlegt.
+            </p>
+        </section>
+
+        <section id="chain-tokens">
+            <h2>Token‑Typen</h2>
+            <p>
+                Die ELTT‑Blockchain kennt deterministisch definierte Token‑Typen, die in allen Implementierungen
+                paritätisch geführt werden.
+            </p>
+            <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left; padding:6px 4px;">Symbol</th>
+                        <th style="text-align:left; padding:6px 4px;">Name</th>
+                        <th style="text-align:left; padding:6px 4px;">Art</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:4px;">TTTC</td>
+                        <td style="padding:4px;">Time &amp; Trust Token</td>
+                        <td style="padding:4px;">NATIVE</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px;">ELTT</td>
+                        <td style="padding:4px;">ELTT Utility Token</td>
+                        <td style="padding:4px;">NATIVE</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px;">ELTC</td>
+                        <td style="padding:4px;">ELTT Credit Token</td>
+                        <td style="padding:4px;">NATIVE</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="chain-structures">
+            <h2>Strukturelle Elemente</h2>
+            <p>
+                Die Blockchain besteht deterministisch aus Blöcken, Transaktionen, Wallets, Token‑Typen, Liquidity‑Pools
+                und Staking‑Positionen. Diese Strukturen sind in C, Python und JavaScript paritätisch definiert.
+            </p>
+            <ul class="bullet-list">
+                <li><strong>Block:</strong> Index, vorheriger Hash, Timestamp, Transaktionsliste, Hash.</li>
+                <li><strong>Transaktion:</strong> From‑Adresse, To‑Adresse, Betrag, Token‑Index, Typ, Memo, Energie.</li>
+                <li><strong>Wallet:</strong> Adresse, Token‑Liste, deterministische Balances.</li>
+                <li><strong>Liquidity‑Pool:</strong> Token‑Index X/Y, LP‑Token‑Index, Reserven X/Y.</li>
+                <li><strong>Staking‑Position:</strong> Adresse, Token‑Index, Betrag.</li>
+            </ul>
+        </section>
+
+        <section id="chain-energy">
+            <h2>Energie‑Formel</h2>
+            <p>
+                Die Energie einer Transaktion wird deterministisch aus einer Kombination von SI‑Byte‑Wert,
+                binärem Byte‑Wert und einem aus dem SHA‑256‑Hash abgeleiteten Bruchteil berechnet. Diese Formel
+                ist in allen Implementierungen identisch.
+            </p>
+            <pre style="margin-top:10px; padding:8px; border-radius:8px; background:#020617; border:1px solid #1f2937; font-size:0.8rem; overflow-x:auto;">
+E(TX) = SI_Byte_Wert(TX) + Binär_Byte_Wert(TX) + (SHA256(TX_Daten) mod 1)
+            </pre>
+        </section>
+
+        <section id="chain-genesis">
+            <h2>Genesis‑Block &amp; Block&nbsp;2</h2>
+            <p>
+                Der Genesis‑Block (Index&nbsp;0) wird deterministisch ohne konkrete Adressen erzeugt. Er initialisiert
+                die Token‑Typen und enthält eine Governance‑Transaktion mit Memo „GENESIS“. Block&nbsp;2 wird
+                ausschließlich von der im Frontend erzeugten Owner‑Wallet autonom erzeugt. Alle Extensions und
+                Folgetransaktionen leiten sich deterministisch von dieser Souveränität ab.
+            </p>
+        </section>
+
+        <section id="chain-modules">
+            <h2>Modul‑Parität</h2>
+            <p>
+                Die zentrale Blockchain‑Logik ist in folgenden Dateien abgebildet und paritätisch gehalten:
+            </p>
+            <ul class="bullet-list">
+                <li><code>ELTT-Blockchain.c</code> – C‑Referenzimplementierung.</li>
+                <li><code>ELTT-Blockchain.py</code> – Python‑Referenzimplementierung.</li>
+                <li><code>assets/js/ELTT-Blockchain.js</code> – Frontend‑Spiegelung.</li>
+                <li><code>PYTHON-ELTT-MODULE-PARITY/…</code> – paritätische Python‑Module.</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer id="app-footer">
+        <p>ELTT‑Blockchain · Deterministisch · Auditierbar · Souverän</p>
+    </footer>
+
+    <script src="assets/js/ui.js"></script>
+    <script src="assets/js/ELTT-Blockchain.js"></script>
+</body>
+</html>

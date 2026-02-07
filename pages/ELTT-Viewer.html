@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>ELTT-Viewer – Deterministische Blockchain-Sicht</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Viewer-Sicht der ELTT-Blockchain. Deterministische, auditierbare Darstellung von Blöcken, Transaktionen und Energie-Werten.">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <header id="app-header">
+        <div class="logo">
+            <span class="logo-main">ELTT‑Blockchain</span>
+            <span class="logo-sub">Viewer · Blöcke · Transaktionen</span>
+        </div>
+        <nav id="main-nav">
+            <a href="../ELTT-Blockchain.html" data-nav="chain">Blockchain</a>
+            <a href="ELTT-wallet.html" data-nav="wallet">Wallet</a>
+            <a href="ELTT-wallet/ELTT-launcher.html" data-nav="launcher">Launcher / DEX</a>
+            <a href="ELTT-wallet/ELTT-liquidity-pools.html" data-nav="pools">Liquidity‑Pools</a>
+            <a href="ELTT-Viewer.html" data-nav="viewer">Viewer</a>
+        </nav>
+    </header>
+
+    <main id="app-main">
+        <section id="viewer-intro">
+            <h2>Deterministischer Blockchain‑Viewer</h2>
+            <p>
+                Diese Viewer‑Sicht zeigt den deterministisch im Frontend gespiegelt gehaltenen Zustand der ELTT‑Blockchain:
+                Blöcke, Transaktionen und Energie‑Werte. Die Owner‑Wallet entsteht ausschließlich im Frontend, ist die
+                einzige Genesis‑Wallet, besitzt TTTC, ELTT und ELTC, erzeugt Block&nbsp;2 autonom und ist Ursprung aller
+                Extensions. Der Viewer liest nur den Zustand, ohne Adressen oder Schlüssel zu verändern.
+            </p>
+        </section>
+
+        <section id="viewer-blocks-section">
+            <h2>Blöcke</h2>
+            <div class="wallet-address-row">
+                <button id="blocks-refresh-btn" class="btn">Blöcke laden / aktualisieren</button>
+            </div>
+            <div id="blocks-empty" class="note">
+                Noch keine Blöcke geladen oder kein Zustand verfügbar.
+            </div>
+            <table id="blocks-table" style="width:100%; border-collapse:collapse; display:none; font-size:0.85rem;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left; padding:6px 4px;">Index</th>
+                        <th style="text-align:left; padding:6px 4px;">Timestamp</th>
+                        <th style="text-align:left; padding:6px 4px;">Hash (gekürzt)</th>
+                        <th style="text-align:left; padding:6px 4px;">Prev‑Hash (gekürzt)</th>
+                        <th style="text-align:right; padding:6px 4px;">TX‑Anzahl</th>
+                    </tr>
+                </thead>
+                <tbody id="blocks-tbody"></tbody>
+            </table>
+        </section>
+
+        <section id="viewer-block-detail-section">
+            <h2>Block‑Details</h2>
+            <div class="wallet-address-row">
+                <input id="block-index-input" type="number" step="1" min="0" placeholder="Block‑Index" autocomplete="off">
+                <button id="block-load-btn" class="btn">Block‑Details laden</button>
+            </div>
+            <div id="block-detail-empty" class="note">
+                Noch kein Block ausgewählt oder keine Daten verfügbar.
+            </div>
+            <pre id="block-detail-output" style="margin-top:10px; padding:8px; border-radius:8px; background:#020617; border:1px solid #1f2937; font-size:0.8rem; overflow-x:auto; display:none;"></pre>
+        </section>
+
+        <section id="viewer-tx-energy-section">
+            <h2>Transaktions‑Energie prüfen</h2>
+            <p class="note">
+                Diese Ansicht berechnet deterministisch die Energie einer synthetischen Transaktion, ohne sie zu committen.
+            </p>
+            <div class="wallet-transfer-grid">
+                <div class="wallet-transfer-field">
+                    <label for="energy-from">From‑Adresse</label>
+                    <input id="energy-from" type="text" placeholder="From‑Adresse" autocomplete="off">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="energy-to">To‑Adresse</label>
+                    <input id="energy-to" type="text" placeholder="To‑Adresse" autocomplete="off">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="energy-amount">Betrag</label>
+                    <input id="energy-amount" type="number" step="0.00000001" min="0" placeholder="0.0">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="energy-token-index">Token‑Index</label>
+                    <input id="energy-token-index" type="number" step="1" min="0" placeholder="0">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="energy-kind">TX‑Typ</label>
+                    <input id="energy-kind" type="text" placeholder="z. B. TRANSFER" autocomplete="off">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="energy-memo">Memo (optional, max. 128 Zeichen)</label>
+                    <input id="energy-memo" type="text" maxlength="128" placeholder="">
+                </div>
+            </div>
+            <div class="wallet-transfer-actions">
+                <button id="energy-build-btn" class="btn">Energie deterministisch berechnen</button>
+            </div>
+            <pre id="energy-output" style="margin-top:10px; padding:8px; border-radius:8px; background:#020617; border:1px solid #1f2937; font-size:0.8rem; overflow-x:auto; display:none;"></pre>
+        </section>
+    </main>
+
+    <footer id="app-footer">
+        <p>ELTT‑Viewer · Deterministisch · Auditierbar · Souverän</p>
+    </footer>
+
+    <script src="../assets/js/ui.js"></script>
+    <script src="../assets/js/ELTT-Blockchain.js"></script>
+    <script src="../assets/js/ELTT-wallet.js"></script>
+    <script>
+        (function () {
+            const blocksRefreshBtn = document.getElementById("blocks-refresh-btn");
+            const blocksEmpty = document.getElementById("blocks-empty");
+            const blocksTable = document.getElementById("blocks-table");
+            const blocksTbody = document.getElementById("blocks-tbody");
+
+            const blockIndexInput = document.getElementById("block-index-input");
+            const blockLoadBtn = document.getElementById("block-load-btn");
+            const blockDetailEmpty = document.getElementById("block-detail-empty");
+            const blockDetailOutput = document.getElementById("block-detail-output");
+
+            const energyFrom = document.getElementById("energy-from");
+            const energyTo = document.getElementById("energy-to");
+            const energyAmount = document.getElementById("energy-amount");
+            const energyTokenIndex = document.getElementById("energy-token-index");
+            const energyKind = document.getElementById("energy-kind");
+            const energyMemo = document.getElementById("energy-memo");
+            const energyBuildBtn = document.getElementById("energy-build-btn");
+            const energyOutput = document.getElementById("energy-output");
+
+            function getBlockchainSnapshot() {
+                const state = window.ELTTWallet.exportState();
+                return state;
+            }
+
+            function renderBlocks() {
+                const snapshot = getBlockchainSnapshot();
+                const blocks = snapshot && snapshot.blocks ? snapshot.blocks : [];
+                if (!blocks || blocks.length === 0) {
+                    blocksEmpty.style.display = "block";
+                    blocksTable.style.display = "none";
+                    blocksTbody.innerHTML = "";
+                    return;
+                }
+                blocksEmpty.style.display = "none";
+                blocksTable.style.display = "table";
+                blocksTbody.innerHTML = "";
+                blocks.forEach((b) => {
+                    const hashShort = (b.hash || "").slice(0, 16);
+                    const prevShort = (b.prevHash || "").slice(0, 16);
+                    const txCount = (b.transactions || []).length;
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td style="padding:4px;">${b.index}</td>
+                        <td style="padding:4px;">${b.timestamp}</td>
+                        <td style="padding:4px;">${hashShort}</td>
+                        <td style="padding:4px;">${prevShort}</td>
+                        <td style="padding:4px; text-align:right;">${txCount}</td>
+                    `;
+                    blocksTbody.appendChild(tr);
+                });
+            }
+
+            function renderBlockDetail(idx) {
+                const snapshot = getBlockchainSnapshot();
+                const blocks = snapshot && snapshot.blocks ? snapshot.blocks : [];
+                const block = blocks.find((b) => b.index === idx);
+                if (!block) {
+                    blockDetailEmpty.style.display = "block";
+                    blockDetailOutput.style.display = "none";
+                    blockDetailOutput.textContent = "";
+                    return;
+                }
+                blockDetailEmpty.style.display = "none";
+                blockDetailOutput.style.display = "block";
+                blockDetailOutput.textContent = JSON.stringify(block, null, 2);
+            }
+
+            function onBlocksRefresh() {
+                renderBlocks();
+            }
+
+            function onBlockLoad() {
+                const idx = parseInt(blockIndexInput.value || "0", 10);
+                if (!Number.isInteger(idx) || idx < 0) {
+                    renderBlockDetail(-1);
+                    return;
+                }
+                renderBlockDetail(idx);
+            }
+
+            function onEnergyBuild() {
+                const from = (energyFrom.value || "").trim();
+                const to = (energyTo.value || "").trim();
+                const amount = parseFloat(energyAmount.value || "0");
+                const tokenIndex = parseInt(energyTokenIndex.value || "0", 10);
+                const kindStr = (energyKind.value || "").trim();
+                const memo = (energyMemo.value || "").slice(0, 128);
+
+                if (!from || !to || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(tokenIndex) || tokenIndex < 0 || !kindStr) {
+                    return;
+                }
+
+                const { Transaction, TxKind, computeTxEnergy } = window.ELTTBlockchain;
+                const kind = TxKind[kindStr] || kindStr;
+
+                const tx = new Transaction(
+                    from,
+                    to,
+                    amount,
+                    tokenIndex,
+                    kind,
+                    memo
+                );
+                computeTxEnergy(tx);
+
+                energyOutput.style.display = "block";
+                energyOutput.textContent = JSON.stringify(tx, null, 2);
+            }
+
+            blocksRefreshBtn.addEventListener("click", onBlocksRefresh);
+            blockLoadBtn.addEventListener("click", onBlockLoad);
+            blockIndexInput.addEventListener("keydown", (ev) => {
+                if (ev.key === "Enter") {
+                    onBlockLoad();
+                }
+            });
+            energyBuildBtn.addEventListener("click", onEnergyBuild);
+        })();
+    </script>
+</body>
+</html>

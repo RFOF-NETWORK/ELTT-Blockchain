@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>ELTT-Liquidity-Pools – Deterministische Poolsicht</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Liquidity-Pool-Sicht der ELTT-Blockchain. Deterministische, auditierbare und souveränitätsfokussierte Verwaltung von Pools.">
+    <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+<body>
+    <header id="app-header">
+        <div class="logo">
+            <span class="logo-main">ELTT‑Blockchain</span>
+            <span class="logo-sub">Liquidity‑Pools · Deterministische Reserven</span>
+        </div>
+        <nav id="main-nav">
+            <a href="../../ELTT-Blockchain.html" data-nav="chain">Blockchain</a>
+            <a href="../ELTT-wallet.html" data-nav="wallet">Wallet</a>
+            <a href="ELTT-launcher.html" data-nav="launcher">Launcher / DEX</a>
+            <a href="ELTT-liquidity-pools.html" data-nav="pools">Liquidity‑Pools</a>
+            <a href="../ELTT-Viewer.html" data-nav="viewer">Viewer</a>
+        </nav>
+    </header>
+
+    <main id="app-main">
+        <section id="pools-intro">
+            <h2>Deterministische Liquidity‑Pools</h2>
+            <p>
+                Diese Poolsicht arbeitet deterministisch auf dem Blockchain‑Zustand, der im Frontend gespiegelt wird.
+                Die Owner‑Wallet entsteht aus einer 12‑Wort‑Phrase im Frontend, ist die einzige Genesis‑Wallet,
+                besitzt TTTC, ELTT und ELTC, erzeugt Block&nbsp;2 autonom und ist Ursprung aller Extensions.
+                Liquidity‑Pools werden ohne Hardcoding von Adressen oder Schlüsseln verwaltet.
+            </p>
+        </section>
+
+        <section id="pools-index-section">
+            <h2>Pool‑Index</h2>
+            <div class="wallet-address-row">
+                <input id="pool-index-input" type="number" step="1" min="0" placeholder="Pool‑Index" autocomplete="off">
+                <button id="pool-load-btn" class="btn">Pool‑Zustand laden</button>
+            </div>
+            <p class="note">
+                Der Pool‑Index referenziert deterministisch einen Eintrag in der Pool‑Liste der Blockchain‑Spiegelung.
+            </p>
+        </section>
+
+        <section id="pools-state-section">
+            <h2>Pool‑Zustand</h2>
+            <div id="pool-state-empty" class="note">
+                Noch kein Pool geladen oder kein Pool unter diesem Index vorhanden.
+            </div>
+            <table id="pool-state-table" style="width:100%; border-collapse:collapse; display:none; font-size:0.85rem;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left; padding:6px 4px;">Pool‑Index</th>
+                        <th style="text-align:left; padding:6px 4px;">Token‑Index X</th>
+                        <th style="text-align:left; padding:6px 4px;">Token‑Index Y</th>
+                        <th style="text-align:left; padding:6px 4px;">LP‑Token‑Index</th>
+                        <th style="text-align:right; padding:6px 4px;">Reserve X</th>
+                        <th style="text-align:right; padding:6px 4px;">Reserve Y</th>
+                    </tr>
+                </thead>
+                <tbody id="pool-state-tbody"></tbody>
+            </table>
+        </section>
+
+        <section id="pools-local-ops-section">
+            <h2>Lokale, deterministische Reserve‑Simulation</h2>
+            <p class="note">
+                Diese Operationen verändern nur den im Frontend gespiegelt gehaltenen Zustand und dienen der
+                deterministischen Simulation. Commit‑Operationen erfolgen über dedizierte Transaktionen.
+            </p>
+            <div class="wallet-transfer-grid">
+                <div class="wallet-transfer-field">
+                    <label for="sim-pool-index">Pool‑Index</label>
+                    <input id="sim-pool-index" type="number" step="1" min="0" placeholder="Pool‑Index">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="sim-amount-x">Δ Reserve X</label>
+                    <input id="sim-amount-x" type="number" step="0.00000001" placeholder="0.0">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="sim-amount-y">Δ Reserve Y</label>
+                    <input id="sim-amount-y" type="number" step="0.00000001" placeholder="0.0">
+                </div>
+            </div>
+            <div class="wallet-transfer-actions">
+                <button id="sim-add-btn" class="btn">Reservenzuwachs simulieren</button>
+                <button id="sim-remove-btn" class="btn">Reservenreduktion simulieren</button>
+            </div>
+        </section>
+    </main>
+
+    <footer id="app-footer">
+        <p>ELTT‑Liquidity‑Pools · Deterministisch · Auditierbar · Souverän</p>
+    </footer>
+
+    <script src="../../assets/js/ui.js"></script>
+    <script src="../../assets/js/ELTT-Blockchain.js"></script>
+    <script src="../../assets/js/ELTT-wallet.js"></script>
+    <script src="../../assets/js/ELTT-liquidity-pools.js"></script>
+    <script>
+        (function () {
+            const poolIndexInput = document.getElementById("pool-index-input");
+            const poolLoadBtn = document.getElementById("pool-load-btn");
+            const poolStateEmpty = document.getElementById("pool-state-empty");
+            const poolStateTable = document.getElementById("pool-state-table");
+            const poolStateTbody = document.getElementById("pool-state-tbody");
+
+            const simPoolIndex = document.getElementById("sim-pool-index");
+            const simAmountX = document.getElementById("sim-amount-x");
+            const simAmountY = document.getElementById("sim-amount-y");
+            const simAddBtn = document.getElementById("sim-add-btn");
+            const simRemoveBtn = document.getElementById("sim-remove-btn");
+
+            function renderPoolState(state) {
+                if (!state) {
+                    poolStateEmpty.style.display = "block";
+                    poolStateTable.style.display = "none";
+                    poolStateTbody.innerHTML = "";
+                    return;
+                }
+                poolStateEmpty.style.display = "none";
+                poolStateTable.style.display = "table";
+                poolStateTbody.innerHTML = "";
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td style="padding:4px;">${state.index}</td>
+                    <td style="padding:4px;">${state.tokenXIndex}</td>
+                    <td style="padding:4px;">${state.tokenYIndex}</td>
+                    <td style="padding:4px;">${state.lpTokenIndex}</td>
+                    <td style="padding:4px; text-align:right;">${state.reserveX}</td>
+                    <td style="padding:4px; text-align:right;">${state.reserveY}</td>
+                `;
+                poolStateTbody.appendChild(tr);
+            }
+
+            function onLoadPool() {
+                const idx = parseInt(poolIndexInput.value || "0", 10);
+                if (!Number.isInteger(idx) || idx < 0) {
+                    renderPoolState(null);
+                    return;
+                }
+                const state = window.ELTTLiquidityPools.getPoolState(idx);
+                renderPoolState(state);
+            }
+
+            function onSimAdd() {
+                const idx = parseInt(simPoolIndex.value || "0", 10);
+                const dx = parseFloat(simAmountX.value || "0");
+                const dy = parseFloat(simAmountY.value || "0");
+                if (!Number.isInteger(idx) || idx < 0 || !Number.isFinite(dx) || !Number.isFinite(dy)) {
+                    return;
+                }
+                window.ELTTLiquidityPools.applyAddLiquidityLocally(idx, dx, dy);
+                const state = window.ELTTLiquidityPools.getPoolState(idx);
+                renderPoolState(state);
+            }
+
+            function onSimRemove() {
+                const idx = parseInt(simPoolIndex.value || "0", 10);
+                const dx = parseFloat(simAmountX.value || "0");
+                const dy = parseFloat(simAmountY.value || "0");
+                if (!Number.isInteger(idx) || idx < 0 || !Number.isFinite(dx) || !Number.isFinite(dy)) {
+                    return;
+                }
+                window.ELTTLiquidityPools.applyRemoveLiquidityLocally(idx, dx, dy);
+                const state = window.ELTTLiquidityPools.getPoolState(idx);
+                renderPoolState(state);
+            }
+
+            poolLoadBtn.addEventListener("click", onLoadPool);
+            poolIndexInput.addEventListener("keydown", (ev) => {
+                if (ev.key === "Enter") {
+                    onLoadPool();
+                }
+            });
+
+            simAddBtn.addEventListener("click", onSimAdd);
+            simRemoveBtn.addEventListener("click", onSimRemove);
+        })();
+    </script>
+</body>
+</html>
