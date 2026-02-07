@@ -2,7 +2,7 @@
 
 /*
  * BUTTONS/wallet-buttons.js
- * Überarbeitete Version: Wallet-Login-Erkennung, STATE-Integration,
+ * Wallet-Login-Erkennung, STATE-Integration,
  * deterministische Sichtbarkeit von Create/Settings/Profil.
  */
 
@@ -106,39 +106,42 @@
     }
 
     /* -------------------------
-       STATE-Integration
+       STATE-Integration (über ELTTBlockchain)
     -------------------------- */
 
-    function saveWalletToState(address) {
-        if (!window.ELTT_STATE) window.ELTT_STATE = {};
-        if (!window.ELTT_STATE.wallets) window.ELTT_STATE.wallets = {};
+    function persistOwnerInState(address) {
+        if (!window.ELTTBlockchain || !window.ELTTBlockchain.withPersistentBlockchain) {
+            return;
+        }
 
-        window.ELTT_STATE.wallets[address] = {
-            address,
-            balances: {
-                TTTC: 0,
-                ELTT: 0,
-                ELTC: 0
+        window.ELTTBlockchain.withPersistentBlockchain((bc) => {
+            // Token-Typen sicherstellen (Genesis, falls leer)
+            window.ELTTBlockchain.createGenesis(bc);
+
+            // Wallet anlegen, falls nicht vorhanden
+            const w = window.ELTTBlockchain.getWallet(bc, address) ||
+                      window.ELTTBlockchain.createWallet(bc, address);
+
+            // Owner-Genesis-Block nur, wenn noch kein Block mit diesem Memo existiert
+            const hasOwnerGenesis = bc.blocks.some(
+                (b) => b.transactions.some((t) => t.memo === "OWNER-GENESIS" && t.toAddress === address)
+            );
+            if (!hasOwnerGenesis) {
+                const tx = new window.ELTTBlockchain.Transaction(
+                    "",
+                    address,
+                    0.0,
+                    0,
+                    window.ELTTBlockchain.TxKind.GOVERNANCE,
+                    "OWNER-GENESIS"
+                );
+                window.ELTTBlockchain.computeTxEnergy(tx);
+                const ts = Date.now();
+                window.ELTTBlockchain.appendBlock(bc, [tx], ts);
             }
-        };
-    }
 
-    function saveGenesisBlockToState(address) {
-        if (!window.ELTT_STATE) window.ELTT_STATE = {};
-        if (!window.ELTT_STATE.blocks) window.ELTT_STATE.blocks = [];
-
-        const genesis = {
-            index: 1,
-            timestamp: Date.now(),
-            from: "",
-            to: address,
-            token: "TTTC",
-            amount: 0,
-            memo: "OWNER-GENESIS",
-            hash: simpleHashHex(address + Date.now())
-        };
-
-        window.ELTT_STATE.blocks.push(genesis);
+            return bc;
+        });
     }
 
     /* -------------------------
@@ -158,8 +161,8 @@
             created_at: new Date().toISOString()
         });
 
-        saveWalletToState(addr);
-        saveGenesisBlockToState(addr);
+        // Persistente Verankerung im Blockchain-STATE
+        persistOwnerInState(addr);
 
         return addr;
     }
@@ -175,13 +178,15 @@
         const wrap = createElement("div", null);
         wrap.appendChild(createElement("h3", null, "Wallet Settings"));
 
-        const info = createElement("p", null,
+        const info = createElement(
+            "p",
+            null,
             addr ? "Owner‑Wallet ist gesetzt." : "Noch keine Owner‑Wallet gesetzt."
         );
         wrap.appendChild(info);
 
         const phraseBox = createElement("textarea", { readonly: "readonly" });
-        phraseBox.value = settings?.mnemonic || "";
+        phraseBox.value = settings && settings.mnemonic ? settings.mnemonic : "";
         wrap.appendChild(phraseBox);
 
         const addrBox = createElement("input", { readonly: "readonly" });
@@ -236,32 +241,40 @@
             walletSection.appendChild(btnRow);
         }
 
-        /* Create Wallet */
+        // Create Wallet
         if (!addr) {
             const createBtn = createElement("button", null, "Create Wallet");
             createBtn.addEventListener("click", () => {
-                createOwnerWalletIfNeeded();
+                const newAddr = createOwnerWalletIfNeeded();
+                // optional: Adresse ins Eingabefeld spiegeln, falls vorhanden
+                const addrInput = qs("#wallet-address-input");
+                if (addrInput) {
+                    addrInput.value = newAddr;
+                    addrInput.dispatchEvent(new Event("input", { bubbles: true }));
+                }
                 location.reload();
             });
             btnRow.appendChild(createBtn);
         }
 
-        /* Settings */
+        // Settings
         if (addr) {
             const settingsBtn = createElement("button", null, "Settings");
             settingsBtn.addEventListener("click", () => {
                 const view = renderSettingsView();
-                alert("Settings öffnen"); // Platzhalter für Overlay
+                // hier könntest du dein Overlay-System einhängen
+                alert("Settings öffnen");
             });
             btnRow.appendChild(settingsBtn);
         }
 
-        /* Profil */
+        // Profil
         if (addr) {
             const profileBtn = createElement("button", null, "Profil");
             profileBtn.addEventListener("click", () => {
                 const view = renderProfileView();
-                alert("Profil öffnen"); // Platzhalter für Overlay
+                // hier könntest du dein Overlay-System einhängen
+                alert("Profil öffnen");
             });
             btnRow.appendChild(profileBtn);
         }
