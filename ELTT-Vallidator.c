@@ -1,19 +1,18 @@
-/* ELTT-Validator.c
+/* ELTT-Viewer.c
  *
- * Formale, deterministische Referenzimplementierung der Validierungslogik
+ * Formale, deterministische Referenzimplementierung der Viewer-Logik
  * für die ELTT-Blockchain. Reines C, nur Standardbibliothek.
  *
- * Diese Datei prüft:
- * - Blockkonsistenz (Index, PrevHash, Hash)
- * - Transaktionsvalidität (Salden, Token-Typen, Regeln)
- * - Energie- und Token-Regeln (75 % Bindung, 25 % Reward) auf Logikebene
+ * Diese Datei stellt reine Lese- und Struktur-Funktionen bereit:
+ * - Zugriff auf Blöcke, Transaktionen, Wallets, Token, Pools, Staking.
+ * - Ableitung von Chain-Grid-, Token-/Energie- und Positions-Ansichten.
+ * - BIP-ähnliche Vorschlags- und Governance-Sicht.
  *
- * Die Owner-Wallet, Genesis-Wallet, Phrasen und konkrete Initialzustände
- * werden ausschließlich im Frontend bestimmt und hier nicht fest verdrahtet.
+ * Keine UI, keine Beispiele, keine externen Abhängigkeiten.
  */
 
-#ifndef ELTT_VALIDATOR_H
-#define ELTT_VALIDATOR_H
+#ifndef ELTT_VIEWER_H
+#define ELTT_VIEWER_H
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -121,7 +120,59 @@ typedef struct {
 } eltt_blockchain;
 
 /* ----------------------------------------------------------
- * Externe Funktionen aus ELTT-Blockchain.c (Signaturen)
+ * Viewer-spezifische Strukturen
+ * ---------------------------------------------------------- */
+
+typedef struct {
+    uint32_t index;
+    uint64_t timestamp;
+    uint8_t  hash[32];
+    uint8_t  prev_hash[32];
+    size_t   tx_count;
+} eltt_chain_grid_entry;
+
+typedef struct {
+    int token_index;
+    double balance;
+    double energy_value;
+} eltt_token_position;
+
+typedef struct {
+    int lp_token_index;
+    int pool_index;
+    double lp_balance;
+    double share_x;
+    double share_y;
+    double energy_value;
+} eltt_lp_position;
+
+typedef struct {
+    int stake_index;
+    int token_index;
+    double amount;
+    uint64_t start_timestamp;
+    uint64_t lock_until;
+    double accumulated_rewards;
+    double energy_value;
+} eltt_staking_view_entry;
+
+typedef struct {
+    int pool_index;
+    int token_x_index;
+    int token_y_index;
+    double reserve_x;
+    double reserve_y;
+    int lp_token_index;
+} eltt_pool_view_entry;
+
+typedef struct {
+    size_t tx_index;
+    uint32_t block_index;
+    eltt_tx_kind kind;
+} eltt_bip_like_entry;
+
+/* ----------------------------------------------------------
+ * Externe Energie-Funktion aus ELTT-Blockchain.c
  * ---------------------------------------------------------- */
 
 #ifdef __cplusplus
@@ -134,7 +185,7 @@ double eltt_blockchain_compute_tx_energy(const eltt_transaction *tx);
  * Interne Hilfsfunktionen
  * ---------------------------------------------------------- */
 
-static int eltt_validator_find_wallet_index(const eltt_blockchain *bc, const char *address)
+static int eltt_viewer_find_wallet_index(const eltt_blockchain *bc, const char *address)
 {
     for (size_t i = 0; i < bc->wallet_count; ++i) {
         if (strcmp(bc->wallets[i].address, address) == 0) {
@@ -144,232 +195,236 @@ static int eltt_validator_find_wallet_index(const eltt_blockchain *bc, const cha
     return -1;
 }
 
-static int eltt_validator_is_core_token(const eltt_blockchain *bc, int token_index)
+/* ----------------------------------------------------------
+ * Chain-Grid-Ansicht
+ * ---------------------------------------------------------- */
+
+size_t eltt_viewer_build_chain_grid(const eltt_blockchain *bc,
+                                    eltt_chain_grid_entry *out_entries,
+                                    size_t max_entries)
 {
-    if (token_index < 0 || (size_t)token_index >= bc->token_count) {
-        return 0;
+    size_t count = (bc->block_count < max_entries) ? bc->block_count : max_entries;
+    for (size_t i = 0; i < count; ++i) {
+        const eltt_block *b = &bc->blocks[i];
+        eltt_chain_grid_entry *e = &out_entries[i];
+        e->index = b->index;
+        e->timestamp = b->timestamp;
+        memcpy(e->hash, b->hash, 32);
+        memcpy(e->prev_hash, b->prev_hash, 32);
+        e->tx_count = b->tx_count;
     }
-    eltt_token_kind k = bc->token_types[token_index].kind;
-    return (k == ELTT_TOKEN_KIND_TTTC ||
-            k == ELTT_TOKEN_KIND_ELTT ||
-            k == ELTT_TOKEN_KIND_ELTC);
+    return count;
 }
 
 /* ----------------------------------------------------------
- * Validierung einzelner Transaktionen
+ * Token-/Energie-Ansicht für eine Wallet
  * ---------------------------------------------------------- */
 
-static int eltt_validator_validate_transfer_like(const eltt_blockchain *bc,
-                                                 const eltt_transaction *tx)
+size_t eltt_viewer_build_token_positions(const eltt_blockchain *bc,
+                                         const char *wallet_address,
+                                         eltt_token_position *out_positions,
+                                         size_t max_positions)
 {
-    if (tx->amount <= 0.0) {
+    int widx = eltt_viewer_find_wallet_index(bc, wallet_address);
+    if (widx < 0) {
         return 0;
     }
-    if (tx->token_index < 0 || (size_t)tx->token_index >= bc->token_count) {
-        return 0;
-    }
-    int from_idx = eltt_validator_find_wallet_index(bc, tx->from);
-    if (from_idx < 0) {
-        return 0;
-    }
-    if (bc->wallets[from_idx].balances[tx->token_index] < tx->amount) {
-        return 0;
-    }
-    return 1;
-}
+    const eltt_wallet *w = &bc->wallets[widx];
 
-static int eltt_validator_validate_mint(const eltt_blockchain *bc,
-                                        const eltt_transaction *tx)
-{
-    if (tx->amount <= 0.0) {
-        return 0;
+    size_t count = (w->token_count < max_positions) ? w->token_count : max_positions;
+    for (size_t i = 0; i < count; ++i) {
+        eltt_token_position *p = &out_positions[i];
+        p->token_index = (int)i;
+        p->balance = w->balances[i];
+        p->energy_value = 0.0;
     }
-    if (tx->token_index < 0 || (size_t)tx->token_index >= bc->token_count) {
-        return 0;
-    }
-    int to_idx = eltt_validator_find_wallet_index(bc, tx->to);
-    if (to_idx < 0) {
-        return 0;
-    }
-    return 1;
-}
-
-static int eltt_validator_validate_burn(const eltt_blockchain *bc,
-                                        const eltt_transaction *tx)
-{
-    if (tx->amount <= 0.0) {
-        return 0;
-    }
-    if (tx->token_index < 0 || (size_t)tx->token_index >= bc->token_count) {
-        return 0;
-    }
-    int from_idx = eltt_validator_find_wallet_index(bc, tx->from);
-    if (from_idx < 0) {
-        return 0;
-    }
-    if (bc->wallets[from_idx].balances[tx->token_index] < tx->amount) {
-        return 0;
-    }
-    return 1;
-}
-
-static int eltt_validator_validate_create_token(const eltt_blockchain *bc,
-                                                const eltt_transaction *tx)
-{
-    (void)bc;
-    (void)tx;
-    return 1;
-}
-
-static int eltt_validator_validate_pool_ops(const eltt_blockchain *bc,
-                                            const eltt_transaction *tx)
-{
-    (void)bc;
-    (void)tx;
-    return 1;
-}
-
-static int eltt_validator_validate_staking_ops(const eltt_blockchain *bc,
-                                               const eltt_transaction *tx)
-{
-    (void)bc;
-    (void)tx;
-    return 1;
-}
-
-static int eltt_validator_validate_profile_or_governance(const eltt_blockchain *bc,
-                                                         const eltt_transaction *tx)
-{
-    (void)bc;
-    (void)tx;
-    return 1;
+    return count;
 }
 
 /* ----------------------------------------------------------
- * Energie- und Token-Regeln (75 % Bindung, 25 % Reward)
+ * LP-Positionen für eine Wallet
  * ---------------------------------------------------------- */
 
-static int eltt_validator_check_energy_binding(const eltt_blockchain *bc,
-                                               const eltt_transaction *tx)
+size_t eltt_viewer_build_lp_positions(const eltt_blockchain *bc,
+                                      const char *wallet_address,
+                                      eltt_lp_position *out_positions,
+                                      size_t max_positions)
 {
-    if (!eltt_validator_is_core_token(bc, tx->token_index)) {
-        return 1;
-    }
-
-    double energy = eltt_blockchain_compute_tx_energy(tx);
-    if (energy < 0.0) {
+    int widx = eltt_viewer_find_wallet_index(bc, wallet_address);
+    if (widx < 0) {
         return 0;
     }
+    const eltt_wallet *w = &bc->wallets[widx];
 
-    double bound = energy * 0.75;
-    double reward = energy * 0.25;
-    (void)bound;
-    (void)reward;
+    size_t out_count = 0;
+    for (size_t p = 0; p < bc->pool_count && out_count < max_positions; ++p) {
+        const eltt_liquidity_pool *pool = &bc->pools[p];
+        int lp_idx = pool->lp_token_index;
+        if (lp_idx < 0 || (size_t)lp_idx >= w->token_count) {
+            continue;
+        }
+        double lp_balance = w->balances[lp_idx];
+        if (lp_balance <= 0.0) {
+            continue;
+        }
 
-    return 1;
+        eltt_lp_position *pos = &out_positions[out_count++];
+        pos->lp_token_index = lp_idx;
+        pos->pool_index = (int)p;
+        pos->lp_balance = lp_balance;
+
+        double total_lp = 1.0;
+        double share = (total_lp > 0.0) ? (lp_balance / total_lp) : 0.0;
+        pos->share_x = pool->reserve_x * share;
+        pos->share_y = pool->reserve_y * share;
+        pos->energy_value = 0.0;
+    }
+
+    return out_count;
 }
 
 /* ----------------------------------------------------------
- * Öffentliche Validierungsfunktionen
+ * Staking-Ansicht für eine Wallet
  * ---------------------------------------------------------- */
 
-int eltt_validator_validate_transaction_full(const eltt_blockchain *bc,
-                                             const eltt_transaction *tx)
+size_t eltt_viewer_build_staking_view(const eltt_blockchain *bc,
+                                      const char *wallet_address,
+                                      eltt_staking_view_entry *out_entries,
+                                      size_t max_entries)
 {
-    if (tx->token_index < 0 || (size_t)tx->token_index >= bc->token_count) {
-        return 0;
+    size_t out_count = 0;
+    for (size_t i = 0; i < bc->stake_count && out_count < max_entries; ++i) {
+        const eltt_staking_position *s = &bc->stakes[i];
+        if (strcmp(s->owner, wallet_address) != 0) {
+            continue;
+        }
+        eltt_staking_view_entry *e = &out_entries[out_count++];
+        e->stake_index = (int)i;
+        e->token_index = s->token_index;
+        e->amount = s->amount;
+        e->start_timestamp = s->start_timestamp;
+        e->lock_until = s->lock_until;
+        e->accumulated_rewards = s->accumulated_rewards;
+        e->energy_value = 0.0;
     }
-    if (tx->amount < 0.0) {
-        return 0;
-    }
-
-    int ok = 0;
-    switch (tx->kind) {
-        case ELTT_TX_KIND_TRANSFER:
-        case ELTT_TX_KIND_SWAP:
-            ok = eltt_validator_validate_transfer_like(bc, tx);
-            break;
-        case ELTT_TX_KIND_MINT:
-            ok = eltt_validator_validate_mint(bc, tx);
-            break;
-        case ELTT_TX_KIND_BURN:
-            ok = eltt_validator_validate_burn(bc, tx);
-            break;
-        case ELTT_TX_KIND_CREATE_TOKEN:
-            ok = eltt_validator_validate_create_token(bc, tx);
-            break;
-        case ELTT_TX_KIND_CREATE_POOL:
-        case ELTT_TX_KIND_ADD_LIQUIDITY:
-        case ELTT_TX_KIND_REMOVE_LIQUIDITY:
-            ok = eltt_validator_validate_pool_ops(bc, tx);
-            break;
-        case ELTT_TX_KIND_STAKE:
-        case ELTT_TX_KIND_UNSTAKE:
-        case ELTT_TX_KIND_CLAIM_REWARDS:
-            ok = eltt_validator_validate_staking_ops(bc, tx);
-            break;
-        case ELTT_TX_KIND_PROFILE_UPDATE:
-        case ELTT_TX_KIND_GOVERNANCE_PROPOSAL:
-            ok = eltt_validator_validate_profile_or_governance(bc, tx);
-            break;
-        default:
-            ok = 0;
-            break;
-    }
-
-    if (!ok) {
-        return 0;
-    }
-
-    if (!eltt_validator_check_energy_binding(bc, tx)) {
-        return 0;
-    }
-
-    return 1;
+    return out_count;
 }
 
-int eltt_validator_validate_block_header(const eltt_blockchain *bc,
-                                         const eltt_block *block)
+/* ----------------------------------------------------------
+ * Pool-Ansicht (Stats)
+ * ---------------------------------------------------------- */
+
+size_t eltt_viewer_build_pool_view(const eltt_blockchain *bc,
+                                   eltt_pool_view_entry *out_entries,
+                                   size_t max_entries)
 {
-    if (block->index == 0) {
-        uint8_t zero[32];
-        memset(zero, 0, 32);
-        if (memcmp(block->prev_hash, zero, 32) != 0) {
-            return 0;
-        }
-    } else {
-        if (bc->block_count == 0) {
-            return 0;
-        }
-        const eltt_block *prev = &bc->blocks[bc->block_count - 1];
-        if (block->index != prev->index + 1) {
-            return 0;
-        }
-        if (memcmp(block->prev_hash, prev->hash, 32) != 0) {
-            return 0;
-        }
+    size_t count = (bc->pool_count < max_entries) ? bc->pool_count : max_entries;
+    for (size_t i = 0; i < count; ++i) {
+        const eltt_liquidity_pool *p = &bc->pools[i];
+        eltt_pool_view_entry *e = &out_entries[i];
+        e->pool_index = (int)i;
+        e->token_x_index = p->token_x_index;
+        e->token_y_index = p->token_y_index;
+        e->reserve_x = p->reserve_x;
+        e->reserve_y = p->reserve_y;
+        e->lp_token_index = p->lp_token_index;
     }
-    return 1;
+    return count;
 }
 
-int eltt_validator_validate_block_full(const eltt_blockchain *bc,
-                                       const eltt_block *block)
-{
-    if (!eltt_validator_validate_block_header(bc, block)) {
-        return 0;
-    }
+/* ----------------------------------------------------------
+ * BIP-ähnliche Vorschläge (Governance-Transaktionen)
+ * ---------------------------------------------------------- */
 
-    for (size_t i = 0; i < block->tx_count; ++i) {
-        if (!eltt_validator_validate_transaction_full(bc, &block->txs[i])) {
-            return 0;
+size_t eltt_viewer_collect_bip_like_entries(const eltt_blockchain *bc,
+                                            eltt_bip_like_entry *out_entries,
+                                            size_t max_entries)
+{
+    size_t out_count = 0;
+    for (size_t b = 0; b < bc->block_count && out_count < max_entries; ++b) {
+        const eltt_block *blk = &bc->blocks[b];
+        for (size_t t = 0; t < blk->tx_count && out_count < max_entries; ++t) {
+            const eltt_transaction *tx = &blk->txs[t];
+            if (tx->kind == ELTT_TX_KIND_GOVERNANCE_PROPOSAL) {
+                eltt_bip_like_entry *e = &out_entries[out_count++];
+                e->tx_index = t;
+                e->block_index = blk->index;
+                e->kind = tx->kind;
+            }
         }
     }
+    return out_count;
+}
 
-    return 1;
+/* ----------------------------------------------------------
+ * Wallet-Aktivität (Transaktions-Historie)
+ * ---------------------------------------------------------- */
+
+size_t eltt_viewer_collect_wallet_activity(const eltt_blockchain *bc,
+                                           const char *wallet_address,
+                                           eltt_transaction *out_txs,
+                                           uint32_t *out_block_indices,
+                                           size_t max_entries)
+{
+    size_t out_count = 0;
+    for (size_t b = 0; b < bc->block_count && out_count < max_entries; ++b) {
+        const eltt_block *blk = &bc->blocks[b];
+        for (size_t t = 0; t < blk->tx_count && out_count < max_entries; ++t) {
+            const eltt_transaction *tx = &blk->txs[t];
+            if (strcmp(tx->from, wallet_address) == 0 ||
+                strcmp(tx->to, wallet_address) == 0) {
+                out_txs[out_count] = *tx;
+                out_block_indices[out_count] = blk->index;
+                out_count++;
+            }
+        }
+    }
+    return out_count;
+}
+
+/* ----------------------------------------------------------
+ * Chain-Viewer-Funktionen (Detailansichten)
+ * ---------------------------------------------------------- */
+
+const eltt_block *eltt_viewer_get_block_by_index(const eltt_blockchain *bc,
+                                                 uint32_t index)
+{
+    for (size_t i = 0; i < bc->block_count; ++i) {
+        if (bc->blocks[i].index == index) {
+            return &bc->blocks[i];
+        }
+    }
+    return NULL;
+}
+
+const eltt_transaction *eltt_viewer_get_transaction(const eltt_block *block,
+                                                    size_t tx_index)
+{
+    if (!block) {
+        return NULL;
+    }
+    if (tx_index >= block->tx_count) {
+        return NULL;
+    }
+    return &block->txs[tx_index];
+}
+
+/* ----------------------------------------------------------
+ * Live-Modus (logische Sicht)
+ * ---------------------------------------------------------- */
+
+void eltt_viewer_live_snapshot(const eltt_blockchain *bc,
+                               eltt_chain_grid_entry *chain_entries,
+                               size_t max_chain_entries,
+                               eltt_pool_view_entry *pool_entries,
+                               size_t max_pool_entries)
+{
+    eltt_viewer_build_chain_grid(bc, chain_entries, max_chain_entries);
+    eltt_viewer_build_pool_view(bc, pool_entries, max_pool_entries);
 }
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* ELTT_VALIDATOR_H */
+#endif /* ELTT_VIEWER_H */
