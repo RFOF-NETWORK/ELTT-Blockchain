@@ -1,11 +1,11 @@
 // assets/js/ELTT-wallet.js
-
 "use strict";
 
 /*
  * Frontend-Wallet-Logik für die ELTT-Blockchain.
  * Deterministisch, auditierbar, paritätisch, souveränitätsfokussiert.
- * Die Owner-Wallet entsteht ausschließlich im Frontend und ist nicht hartkodiert.
+ * Keine eigene Blockchain, kein eigener STATE.
+ * Alle Operationen laufen über ELTTBlockchain.withPersistentBlockchain.
  */
 
 const ELTTWallet = (() => {
@@ -15,68 +15,74 @@ const ELTTWallet = (() => {
         TokenType,
         Wallet,
         Transaction,
-        Blockchain,
-        initBlockchain,
-        createGenesis,
-        appendBlock,
         computeTxEnergy,
         createWallet,
         getWallet,
         listWalletTokens,
         buildTransferTx,
+        withPersistentBlockchain,
     } = window.ELTTBlockchain;
 
-    let blockchain = null;
     let currentWalletAddress = null;
 
-    function ensureBlockchain() {
-        if (!blockchain) {
-            blockchain = initBlockchain();
-            createGenesis(blockchain);
-        }
-        return blockchain;
-    }
+    /* -------------------------
+       Wallet-Adresse (Frontend)
+    -------------------------- */
 
     function setCurrentWalletAddress(address) {
         currentWalletAddress = address;
-        const bc = ensureBlockchain();
-        createWallet(bc, address);
+
+        // Wallet im persistenten STATE anlegen
+        withPersistentBlockchain((bc) => {
+            createWallet(bc, address);
+            return bc;
+        });
     }
 
     function getCurrentWalletAddress() {
         return currentWalletAddress;
     }
 
+    /* -------------------------
+       Wallet-Sichten (read-only)
+    -------------------------- */
+
     function getCurrentWallet() {
-        if (!currentWalletAddress) {
-            return null;
-        }
-        const bc = ensureBlockchain();
-        return getWallet(bc, currentWalletAddress);
+        if (!currentWalletAddress) return null;
+
+        return withPersistentBlockchain((bc) => {
+            return getWallet(bc, currentWalletAddress) || null;
+        });
     }
 
     function getWalletState(address) {
-        const bc = ensureBlockchain();
-        const w = getWallet(bc, address);
-        if (!w) {
-            return null;
-        }
-        const tokens = listWalletTokens(w).map(([t, bal]) => ({
-            symbol: t.symbol,
-            name: t.name,
-            kind: t.kind,
-            balance: bal,
-        }));
-        return {
-            address: w.address,
-            tokens,
-        };
+        return withPersistentBlockchain((bc) => {
+            const w = getWallet(bc, address);
+            if (!w) return null;
+
+            const tokens = listWalletTokens(w).map(([t, bal]) => ({
+                symbol: t.symbol,
+                name: t.name,
+                kind: t.kind,
+                balance: bal,
+            }));
+
+            return {
+                address: w.address,
+                tokens,
+            };
+        });
     }
+
+    /* -------------------------
+       Transaktionen (deterministisch)
+    -------------------------- */
 
     function buildDeterministicTransfer(toAddress, amount, tokenIndex, memo) {
         if (!currentWalletAddress) {
             throw new Error("No current wallet address set.");
         }
+
         const tx = buildTransferTx(
             currentWalletAddress,
             toAddress,
@@ -84,48 +90,36 @@ const ELTTWallet = (() => {
             tokenIndex,
             memo || ""
         );
+
         computeTxEnergy(tx);
         return tx;
     }
 
-    function applyTransferLocally(tx) {
-        const bc = ensureBlockchain();
-        const from = getWallet(bc, tx.fromAddress);
-        const to = getWallet(bc, tx.toAddress);
-
-        if (!from || !to) {
-            return;
-        }
-        if (tx.tokenIndex < 0 || tx.tokenIndex >= from.balances.length) {
-            return;
-        }
-
-        const idx = tx.tokenIndex;
-        const amount = tx.amount;
-
-        if (from.balances[idx] < amount) {
-            return;
-        }
-
-        from.balances[idx] -= amount;
-        to.balances[idx] += amount;
-    }
+    /* -------------------------
+       Commit (persistent)
+    -------------------------- */
 
     function commitTransactions(transactions, timestamp) {
-        const bc = ensureBlockchain();
-        const txs = transactions.slice();
-        for (const tx of txs) {
-            if (!tx.energy || tx.energy === 0.0) {
-                computeTxEnergy(tx);
+        return withPersistentBlockchain((bc) => {
+            const txs = transactions.slice();
+
+            for (const tx of txs) {
+                if (!tx.energy || tx.energy === 0.0) {
+                    computeTxEnergy(tx);
+                }
             }
-        }
-        const block = appendBlock(bc, txs, timestamp);
-        return block;
+
+            // Engine erzeugt Block + persistiert STATE
+            return window.ELTTBlockchain.appendBlock(bc, txs, timestamp);
+        });
     }
 
+    /* -------------------------
+       Export (persistent)
+    -------------------------- */
+
     function exportState() {
-        const bc = ensureBlockchain();
-        return JSON.parse(JSON.stringify(bc));
+        return window.ELTTBlockchain.loadState();
     }
 
     return Object.freeze({
@@ -134,14 +128,11 @@ const ELTTWallet = (() => {
         TokenType,
         Wallet,
         Transaction,
-        Blockchain,
-        ensureBlockchain,
         setCurrentWalletAddress,
         getCurrentWalletAddress,
         getCurrentWallet,
         getWalletState,
         buildDeterministicTransfer,
-        applyTransferLocally,
         commitTransactions,
         exportState,
     });
