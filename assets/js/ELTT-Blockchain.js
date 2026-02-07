@@ -301,36 +301,6 @@ function buildRemoveLiquidityTx(fromAddress, poolAddress, amountLp, lpTokenIndex
     );
 }
 
-/* Export nach globalem Namespace */
-
-window.ELTTBlockchain = Object.freeze({
-    TokenKind,
-    TxKind,
-    TokenType,
-    Wallet,
-    Transaction,
-    LiquidityPool,
-    StakingPosition,
-    Block,
-    Blockchain,
-    initBlockchain,
-    createGenesis,
-    appendBlock,
-    computeTxEnergy,
-    computeBlockHash,
-    createWallet,
-    getWallet,
-    listWalletTokens,
-    createPool,
-    getPool,
-    buildTransferTx,
-    buildSwapTx,
-    buildAddLiquidityTx,
-    buildRemoveLiquidityTx,
-    loadState,
-    saveState,
-});
-
 /* -------------------------
    STATE: Laden / Speichern
 -------------------------- */
@@ -360,3 +330,188 @@ function loadState() {
 function saveState(state) {
     localStorage.setItem("ELTT_STATE", JSON.stringify(state));
 }
+
+/* -------------------------
+   STATE ↔ Blockchain-Brücke
+-------------------------- */
+
+function blockchainFromState(state) {
+    const bc = new Blockchain();
+
+    // Token-Typen
+    if (Array.isArray(state.tokens)) {
+        for (const t of state.tokens) {
+            bc.tokenTypes.push(new TokenType(t.symbol, t.name, t.kind));
+        }
+    }
+
+    // Wallets
+    if (state.wallets && typeof state.wallets === "object") {
+        for (const addr of Object.keys(state.wallets)) {
+            const wState = state.wallets[addr];
+            const w = new Wallet(addr);
+            w.tokenCount = bc.tokenTypes.length;
+            w.tokens = bc.tokenTypes.slice();
+            w.balances = new Array(bc.tokenTypes.length).fill(0.0);
+
+            if (wState.balances) {
+                for (let i = 0; i < bc.tokenTypes.length; i++) {
+                    const sym = bc.tokenTypes[i].symbol;
+                    if (Object.prototype.hasOwnProperty.call(wState.balances, sym)) {
+                        w.balances[i] = wState.balances[sym];
+                    }
+                }
+            }
+            bc.wallets.push(w);
+        }
+    }
+
+    // Blöcke
+    if (Array.isArray(state.blocks)) {
+        for (const b of state.blocks) {
+            const txs = [];
+            if (Array.isArray(b.transactions)) {
+                for (const t of b.transactions) {
+                    const tx = new Transaction(
+                        t.fromAddress,
+                        t.toAddress,
+                        t.amount,
+                        t.tokenIndex,
+                        t.kind,
+                        t.memo
+                    );
+                    tx.energy = t.energy || 0.0;
+                    txs.push(tx);
+                }
+            }
+            const blk = new Block(b.index, b.prevHash, b.timestamp, txs);
+            blk.hash = b.hash;
+            bc.blocks.push(blk);
+        }
+    }
+
+    // Pools
+    if (Array.isArray(state.pools)) {
+        for (const p of state.pools) {
+            const pool = new LiquidityPool(p.tokenXIndex, p.tokenYIndex, p.lpTokenIndex);
+            pool.reserveX = p.reserveX || 0.0;
+            pool.reserveY = p.reserveY || 0.0;
+            bc.pools.push(pool);
+        }
+    }
+
+    if (bc.blocks.length === 0) {
+        createGenesis(bc);
+    }
+
+    return bc;
+}
+
+function stateFromBlockchain(bc) {
+    const state = {
+        blocks: [],
+        wallets: {},
+        tokens: [],
+        pools: [],
+    };
+
+    // Token-Typen
+    for (const t of bc.tokenTypes) {
+        state.tokens.push({
+            symbol: t.symbol,
+            name: t.name,
+            kind: t.kind,
+        });
+    }
+
+    // Wallets
+    for (const w of bc.wallets) {
+        const balancesBySymbol = {};
+        for (let i = 0; i < w.tokens.length; i++) {
+            const sym = w.tokens[i].symbol;
+            balancesBySymbol[sym] = w.balances[i];
+        }
+        state.wallets[w.address] = {
+            address: w.address,
+            balances: balancesBySymbol,
+        };
+    }
+
+    // Blöcke
+    for (const b of bc.blocks) {
+        const txs = [];
+        for (const t of b.transactions) {
+            txs.push({
+                fromAddress: t.fromAddress,
+                toAddress: t.toAddress,
+                amount: t.amount,
+                tokenIndex: t.tokenIndex,
+                kind: t.kind,
+                memo: t.memo,
+                energy: t.energy,
+            });
+        }
+        state.blocks.push({
+            index: b.index,
+            prevHash: b.prevHash,
+            timestamp: b.timestamp,
+            transactions: txs,
+            hash: b.hash,
+        });
+    }
+
+    // Pools
+    for (const p of bc.pools) {
+        state.pools.push({
+            tokenXIndex: p.tokenXIndex,
+            tokenYIndex: p.tokenYIndex,
+            lpTokenIndex: p.lpTokenIndex,
+            reserveX: p.reserveX,
+            reserveY: p.reserveY,
+        });
+    }
+
+    return state;
+}
+
+function withPersistentBlockchain(fn) {
+    const state = loadState();
+    const bc = blockchainFromState(state);
+    const result = fn(bc);
+    const newState = stateFromBlockchain(bc);
+    saveState(newState);
+    return result;
+}
+
+/* Export nach globalem Namespace */
+
+window.ELTTBlockchain = Object.freeze({
+    TokenKind,
+    TxKind,
+    TokenType,
+    Wallet,
+    Transaction,
+    LiquidityPool,
+    StakingPosition,
+    Block,
+    Blockchain,
+    initBlockchain,
+    createGenesis,
+    appendBlock,
+    computeTxEnergy,
+    computeBlockHash,
+    createWallet,
+    getWallet,
+    listWalletTokens,
+    createPool,
+    getPool,
+    buildTransferTx,
+    buildSwapTx,
+    buildAddLiquidityTx,
+    buildRemoveLiquidityTx,
+    loadState,
+    saveState,
+    blockchainFromState,
+    stateFromBlockchain,
+    withPersistentBlockchain,
+});
