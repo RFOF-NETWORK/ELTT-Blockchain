@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>ELTT-Launcher – DEX & Extensions</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Launcher-/DEX-Sicht der ELTT-Blockchain. Deterministische, auditierbare und souveränitätsfokussierte Interaktion mit Pools und Extensions.">
+    <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+<body>
+    <header id="app-header">
+        <div class="logo">
+            <span class="logo-main">ELTT‑Blockchain</span>
+            <span class="logo-sub">Launcher · DEX · Extensions</span>
+        </div>
+        <nav id="main-nav">
+            <a href="../../ELTT-Blockchain.html" data-nav="chain">Blockchain</a>
+            <a href="../ELTT-wallet.html" data-nav="wallet">Wallet</a>
+            <a href="ELTT-launcher.html" data-nav="launcher">Launcher / DEX</a>
+            <a href="ELTT-liquidity-pools.html" data-nav="pools">Liquidity‑Pools</a>
+            <a href="../ELTT-Viewer.html" data-nav="viewer">Viewer</a>
+        </nav>
+    </header>
+
+    <main id="app-main">
+        <section id="launcher-intro">
+            <h2>Launcher‑Souveränität &amp; DEX</h2>
+            <p>
+                Diese Launcher‑Sicht arbeitet ausschließlich mit der im Frontend gesetzten Wallet‑Adresse.
+                Die Owner‑Wallet entsteht aus einer 12‑Wort‑Phrase im Frontend, ist die einzige Genesis‑Wallet,
+                besitzt TTTC, ELTT und ELTC, erzeugt Block&nbsp;2 autonom und ist Ursprung aller Extensions.
+                Der Launcher erzeugt deterministische Transaktionen für Swaps und Liquidity‑Operationen.
+            </p>
+        </section>
+
+        <section id="launcher-wallet-section">
+            <h2>Aktuelle Wallet‑Adresse</h2>
+            <div class="wallet-address-row">
+                <input id="launcher-wallet-address" type="text" placeholder="Adresse der Wallet (nur Anzeige)" autocomplete="off" readonly>
+            </div>
+            <p class="note">
+                Die Adresse wird in der Wallet‑Sicht gesetzt. Der Launcher liest sie nur deterministisch aus.
+            </p>
+        </section>
+
+        <section id="launcher-swap-section">
+            <h2>Deterministischer Swap</h2>
+            <div class="wallet-transfer-grid">
+                <div class="wallet-transfer-field">
+                    <label for="swap-to">Zieladresse (z. B. Pool‑Adresse)</label>
+                    <input id="swap-to" type="text" placeholder="Zieladresse" autocomplete="off">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="swap-amount-in">Eingangsmenge</label>
+                    <input id="swap-amount-in" type="number" step="0.00000001" min="0" placeholder="0.0">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="swap-token-in-index">Token‑Index (Input)</label>
+                    <input id="swap-token-in-index" type="number" step="1" min="0" placeholder="0">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="swap-memo">Memo (optional, max. 128 Zeichen)</label>
+                    <input id="swap-memo" type="text" maxlength="128" placeholder="">
+                </div>
+            </div>
+            <div class="wallet-transfer-actions">
+                <button id="swap-build-btn" class="btn">Swap‑TX deterministisch erzeugen</button>
+            </div>
+            <pre id="swap-tx-output" style="margin-top:10px; padding:8px; border-radius:8px; background:#020617; border:1px solid #1f2937; font-size:0.8rem; overflow-x:auto; display:none;"></pre>
+        </section>
+
+        <section id="launcher-liquidity-section">
+            <h2>Deterministische Liquidity‑Operationen</h2>
+            <div class="wallet-transfer-grid">
+                <div class="wallet-transfer-field">
+                    <label for="liq-pool-address">Pool‑Adresse</label>
+                    <input id="liq-pool-address" type="text" placeholder="Pool‑Adresse" autocomplete="off">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="liq-amount-x">Betrag Token&nbsp;X</label>
+                    <input id="liq-amount-x" type="number" step="0.00000001" min="0" placeholder="0.0">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="liq-token-x-index">Token‑Index X</label>
+                    <input id="liq-token-x-index" type="number" step="1" min="0" placeholder="0">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="liq-amount-lp">Betrag LP‑Token (für Remove)</label>
+                    <input id="liq-amount-lp" type="number" step="0.00000001" min="0" placeholder="0.0">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="liq-lp-token-index">LP‑Token‑Index</label>
+                    <input id="liq-lp-token-index" type="number" step="1" min="0" placeholder="0">
+                </div>
+                <div class="wallet-transfer-field">
+                    <label for="liq-memo">Memo (optional, max. 128 Zeichen)</label>
+                    <input id="liq-memo" type="text" maxlength="128" placeholder="">
+                </div>
+            </div>
+            <div class="wallet-transfer-actions">
+                <button id="liq-add-build-btn" class="btn">Add‑Liquidity‑TX deterministisch erzeugen</button>
+                <button id="liq-remove-build-btn" class="btn">Remove‑Liquidity‑TX deterministisch erzeugen</button>
+            </div>
+            <pre id="liq-tx-output" style="margin-top:10px; padding:8px; border-radius:8px; background:#020617; border:1px solid #1f2937; font-size:0.8rem; overflow-x:auto; display:none;"></pre>
+        </section>
+    </main>
+
+    <footer id="app-footer">
+        <p>ELTT‑Launcher · Deterministisch · Auditierbar · Souverän</p>
+    </footer>
+
+    <script src="../../assets/js/ui.js"></script>
+    <script src="../../assets/js/ELTT-Blockchain.js"></script>
+    <script src="../../assets/js/ELTT-wallet.js"></script>
+    <script src="../../assets/js/ELTT-launcher.js"></script>
+    <script>
+        (function () {
+            const launcherWalletAddress = document.getElementById("launcher-wallet-address");
+
+            const swapTo = document.getElementById("swap-to");
+            const swapAmountIn = document.getElementById("swap-amount-in");
+            const swapTokenInIndex = document.getElementById("swap-token-in-index");
+            const swapMemo = document.getElementById("swap-memo");
+            const swapBuildBtn = document.getElementById("swap-build-btn");
+            const swapTxOutput = document.getElementById("swap-tx-output");
+
+            const liqPoolAddress = document.getElementById("liq-pool-address");
+            const liqAmountX = document.getElementById("liq-amount-x");
+            const liqTokenXIndex = document.getElementById("liq-token-x-index");
+            const liqAmountLp = document.getElementById("liq-amount-lp");
+            const liqLpTokenIndex = document.getElementById("liq-lp-token-index");
+            const liqMemo = document.getElementById("liq-memo");
+            const liqAddBuildBtn = document.getElementById("liq-add-build-btn");
+            const liqRemoveBuildBtn = document.getElementById("liq-remove-build-btn");
+            const liqTxOutput = document.getElementById("liq-tx-output");
+
+            function syncWalletAddress() {
+                const addr = window.ELTTWallet.getCurrentWalletAddress();
+                launcherWalletAddress.value = addr || "";
+            }
+
+            function onBuildSwap() {
+                const to = (swapTo.value || "").trim();
+                const amountIn = parseFloat(swapAmountIn.value || "0");
+                const tokenInIndex = parseInt(swapTokenInIndex.value || "0", 10);
+                const memo = swapMemo.value || "";
+
+                if (!to || !Number.isFinite(amountIn) || amountIn <= 0 || !Number.isInteger(tokenInIndex) || tokenInIndex < 0) {
+                    return;
+                }
+
+                try {
+                    const tx = window.ELTTLauncher.buildDeterministicSwapTx(
+                        to,
+                        amountIn,
+                        tokenInIndex,
+                        memo
+                    );
+                    swapTxOutput.style.display = "block";
+                    swapTxOutput.textContent = JSON.stringify(tx, null, 2);
+                } catch (e) {
+                    swapTxOutput.style.display = "block";
+                    swapTxOutput.textContent = String(e);
+                }
+            }
+
+            function onBuildAddLiquidity() {
+                const poolAddr = (liqPoolAddress.value || "").trim();
+                const amountX = parseFloat(liqAmountX.value || "0");
+                const tokenXIndex = parseInt(liqTokenXIndex.value || "0", 10);
+                const memo = liqMemo.value || "";
+
+                if (!poolAddr || !Number.isFinite(amountX) || amountX <= 0 || !Number.isInteger(tokenXIndex) || tokenXIndex < 0) {
+                    return;
+                }
+
+                try {
+                    const tx = window.ELTTLauncher.buildDeterministicAddLiquidityTx(
+                        poolAddr,
+                        amountX,
+                        tokenXIndex,
+                        memo
+                    );
+                    liqTxOutput.style.display = "block";
+                    liqTxOutput.textContent = JSON.stringify(tx, null, 2);
+                } catch (e) {
+                    liqTxOutput.style.display = "block";
+                    liqTxOutput.textContent = String(e);
+                }
+            }
+
+            function onBuildRemoveLiquidity() {
+                const poolAddr = (liqPoolAddress.value || "").trim();
+                const amountLp = parseFloat(liqAmountLp.value || "0");
+                const lpTokenIndex = parseInt(liqLpTokenIndex.value || "0", 10);
+                const memo = liqMemo.value || "";
+
+                if (!poolAddr || !Number.isFinite(amountLp) || amountLp <= 0 || !Number.isInteger(lpTokenIndex) || lpTokenIndex < 0) {
+                    return;
+                }
+
+                try {
+                    const tx = window.ELTTLauncher.buildDeterministicRemoveLiquidityTx(
+                        poolAddr,
+                        amountLp,
+                        lpTokenIndex,
+                        memo
+                    );
+                    liqTxOutput.style.display = "block";
+                    liqTxOutput.textContent = JSON.stringify(tx, null, 2);
+                } catch (e) {
+                    liqTxOutput.style.display = "block";
+                    liqTxOutput.textContent = String(e);
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", syncWalletAddress);
+            syncWalletAddress();
+
+            swapBuildBtn.addEventListener("click", onBuildSwap);
+            liqAddBuildBtn.addEventListener("click", onBuildAddLiquidity);
+            liqRemoveBuildBtn.addEventListener("click", onBuildRemoveLiquidity);
+        })();
+    </script>
+</body>
+</html>
