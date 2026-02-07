@@ -1,0 +1,69 @@
+{
+  "viewer_spec": {
+    "description": "Deterministische Viewer-Struktur für die ELTT-Blockchain. Reine Lese-Sicht, kompatibel mit ELTT-Viewer.c.",
+    "version": "1.0.0",
+
+    "chain_grid_entry": {
+      "index": "uint32",
+      "timestamp": "uint64",
+      "hash": "bytes32",
+      "prev_hash": "bytes32",
+      "tx_count": "uint32"
+    },
+
+    "token_position": {
+      "token_index": "int",
+      "balance": "double",
+      "energy_value": "double"
+    },
+
+    "lp_position": {
+      "lp_token_index": "int",
+      "pool_index": "int",
+      "lp_balance": "double",
+      "share_x": "double",
+      "share_y": "double",
+      "energy_value": "double"
+    },
+
+    "staking_view_entry": {
+      "stake_index": "int",
+      "token_index": "int",
+      "amount": "double",
+      "start_timestamp": "uint64",
+      "lock_until": "uint64",
+      "accumulated_rewards": "double",
+      "energy_value": "double"
+    },
+
+    "pool_view_entry": {
+      "pool_index": "int",
+      "token_x_index": "int",
+      "token_y_index": "int",
+      "reserve_x": "double",
+      "reserve_y": "double",
+      "lp_token_index": "int"
+    },
+
+    "bip_like_entry": {
+      "tx_index": "uint32",
+      "block_index": "uint32",
+      "kind": "enum:eltt_tx_kind"
+    },
+
+    "wallet_activity_entry": {
+      "transaction": "eltt_transaction",
+      "block_index": "uint32"
+    },
+
+    "viewer_snapshot": {
+      "chain_grid": "array<chain_grid_entry>",
+      "token_positions": "array<token_position>",
+      "lp_positions": "array<lp_position>",
+      "staking_positions": "array<staking_view_entry>",
+      "pool_view": "array<pool_view_entry>",
+      "bip_like": "array<bip_like_entry>",
+      "wallet_activity": "array<wallet_activity_entry>"
+    }
+  }
+}
