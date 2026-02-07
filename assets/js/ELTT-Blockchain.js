@@ -327,4 +327,36 @@ window.ELTTBlockchain = Object.freeze({
     buildSwapTx,
     buildAddLiquidityTx,
     buildRemoveLiquidityTx,
+    loadState,
+    saveState,
 });
+
+/* -------------------------
+   STATE: Laden / Speichern
+-------------------------- */
+
+function loadState() {
+    try {
+        const raw = localStorage.getItem("ELTT_STATE");
+        if (!raw) {
+            return {
+                blocks: [],
+                wallets: {},
+                tokens: [],
+                pools: [],
+            };
+        }
+        return JSON.parse(raw);
+    } catch (_) {
+        return {
+            blocks: [],
+            wallets: {},
+            tokens: [],
+            pools: [],
+        };
+    }
+}
+
+function saveState(state) {
+    localStorage.setItem("ELTT_STATE", JSON.stringify(state));
+}
