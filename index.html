@@ -1,101 +1,40 @@
 <!DOCTYPE html>
-<html lang="de">
+
+<html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <title>ELTT-Blockchain – Sovereign DEX & Wallet</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Deterministische, auditierbare und souveränitätsfokussierte ELTT-Blockchain mit Owner-Wallet, DEX, Liquidity-Pools und Viewer.">
-    <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="styles.css">
+  <title>Login Web</title>
 </head>
+
 <body>
-    <header id="app-header">
-        <div class="logo">
-            <span class="logo-main">ELTT‑Blockchain</span>
-            <span class="logo-sub">Deterministisch · Auditierbar · Souverän</span>
-        </div>
-        <nav id="main-nav">
-            <a href="ELTT-Blockchain.html" data-nav="chain">Blockchain</a>
-            <a href="pages/ELTT-wallet.html" data-nav="wallet">Wallet</a>
-            <a href="pages/ELTT-wallet/ELTT-launcher.html" data-nav="launcher">Launcher / DEX</a>
-            <a href="pages/ELTT-wallet/ELTT-liquidity-pools.html" data-nav="pools">Liquidity‑Pools</a>
-            <a href="pages/ELTT-Viewer.html" data-nav="viewer">Viewer</a>
-        </nav>
-    </header>
+  <section>
+    <div class="form-box">
+      <div class="form-value">
+        <form action="">
+          <h2>Login</h2>
+          <div class="inputbox">
+            <input type="name" required>
+            <label for="">Username</label>
+          </div>
+          <div class="inputbox">
+            <input type="password" required>
+            <label for="">Password</label>
+          </div>
+          <div class="forget">
+            <label>
+              <p>Forget <a href="#">Password</a>
+            </label></p>
 
-    <main id="app-main">
-        <section id="hero">
-            <h1>ELTT‑Blockchain</h1>
-            <p class="hero-subtitle">
-                Eine deterministische, auditierbare und souveränitätsfokussierte Referenz‑Blockchain
-                mit klarer Trennung von Frontend‑Souveränität und Backend‑Validierung.
-            </p>
-        </section>
-
-        <section id="sovereignty">
-            <h2>Souveränität &amp; Owner‑Wallet</h2>
-            <ul class="bullet-list">
-                <li>Die <strong>Owner‑Wallet</strong> entsteht ausschließlich im <strong>Frontend</strong>.</li>
-                <li>Sie ist die <strong>einzige Genesis‑Wallet</strong>.</li>
-                <li>Sie besitzt alle drei Token: <strong>TTTC</strong>, <strong>ELTT</strong>, <strong>ELTC</strong>.</li>
-                <li>Sie erzeugt <strong>Block&nbsp;2 autonom</strong>.</li>
-                <li>Sie ist der <strong>Ursprung aller Extensions</strong>.</li>
-            </ul>
-            <p class="note">
-                Im Backend (C und Python) wird keine konkrete Owner‑Adresse, kein Seed und kein privater Schlüssel
-                hartkodiert. Alle Schlüssel und Phrasen verbleiben ausschließlich im Frontend.
-            </p>
-        </section>
-
-        <section id="modules">
-            <h2>Module</h2>
-            <div class="module-grid">
-                <article class="module-card">
-                    <h3>Wallet</h3>
-                    <p>Verwaltung der souveränen Owner‑Wallet und weiterer deterministischer Wallets.</p>
-                    <a href="pages/ELTT-wallet.html" class="btn">Wallet öffnen</a>
-                </article>
-                <article class="module-card">
-                    <h3>Launcher / DEX</h3>
-                    <p>Deterministische Swaps, Token‑Launches und Interaktion mit Liquidity‑Pools.</p>
-                    <a href="pages/ELTT-wallet/ELTT-launcher.html" class="btn">Launcher öffnen</a>
-                </article>
-                <article class="module-card">
-                    <h3>Liquidity‑Pools</h3>
-                    <p>Verwaltung von Pools, LP‑Token und deterministischer Liquidität.</p>
-                    <a href="pages/ELTT-wallet/ELTT-liquidity-pools.html" class="btn">Pools öffnen</a>
-                </article>
-                <article class="module-card">
-                    <h3>Blockchain‑Viewer</h3>
-                    <p>Deterministische Ansicht von Blöcken, Transaktionen und Energie‑Werten.</p>
-                    <a href="pages/ELTT-Viewer.html" class="btn">Viewer öffnen</a>
-                </article>
-            </div>
-        </section>
-
-        <section id="determinism">
-            <h2>Determinismus &amp; Parität</h2>
-            <p>
-                Die Frontend‑Logik in <code>assets/js/ELTT-Blockchain.js</code>,
-                <code>ELTT-wallet.js</code>, <code>ELTT-launcher.js</code> und
-                <code>ELTT-liquidity-pools.js</code> ist paritätisch zur zentralen
-                Backend‑Implementierung der ELTT‑Blockchain in C und Python.
-            </p>
-            <p>
-                Alle Berechnungen sind deterministisch, auditierbar und reproduzierbar.
-                Die UI‑Schicht in <code>assets/js/ui.js</code> steuert ausschließlich Darstellung
-                und Interaktion, ohne die Souveränität der Owner‑Wallet zu verletzen.
-            </p>
-        </section>
-    </main>
-
-    <footer id="app-footer">
-        <p>ELTT‑Blockchain · Deterministisch · Auditierbar · Souverän</p>
-    </footer>
-
-    <script src="assets/js/ui.js"></script>
-    <script src="assets/js/ELTT-Blockchain.js"></script>
-    <script src="assets/js/ELTT-wallet.js"></script>
-    <script src="assets/js/ELTT-launcher.js"></script>
-    <script src="assets/js/ELTT-liquidity-pools.js"></script>
+          </div>
+          <button>Log in</button>
+          <div class="register">
+            <p>Don't have a account <a href="#">Register</a></p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
 </body>
+
 </html>
